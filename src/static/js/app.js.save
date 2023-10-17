@@ -23,43 +23,21 @@ function TodoListCard() {
     const onNewItem = React.useCallback(
         newItem => {
             setItems([...items, newItem]);
-        },
-        [items],
-    );
+    }, [items]);
 
-    const onItemUpdate = React.useCallback(
-        item => {
-            const index = items.findIndex(i => i.id === item.id);
-            setItems([
-                ...items.slice(0, index),
-                item,
-                ...items.slice(index + 1),
-            ]);
-        },
-        [items],
-    );
+    const onItemUpdate = React.useCallback(item => {
+        const index = items.findIndex(i => i.id === item.id);
+        setItems([
+            ...items.slice(0, index),
+            item,
+            ...items.slice(index + 1),
+        ]);
+    }, [items]);
 
-    const onItemRemoval = React.useCallback(
-        item => {
-            const index = items.findIndex(i => i.id === item.id);
-            setItems([...items.slice(0, index), ...items.slice(index + 1)]);
-        },
-        [items],
-    );
-
-    const onSubtaskAdd = (item, updatedSubtasks) => {
-        fetch('/items/$(item.id)', {
-            method: 'PUT',
-            body: JSON.stringify({
-                name: item.name,
-                completed: item.completed,
-                subtasks: updatedSubtasks,
-            }),
-            headers: {'Content-Type': 'application/json'},
-        })
-            .then((r) => r.json())
-            .then(onItemUpdate);
-    }
+    const onItemRemoval = React.useCallback(item => {
+        const index = items.findIndex(i => i.id === item.id);
+        setItems([...items.slice(0, index), ...items.slice(index + 1)]);
+    }, [items]);
 
     if (items === null) return 'Loading...';
 
@@ -75,7 +53,6 @@ function TodoListCard() {
                     key={item.id}
                     onItemUpdate={onItemUpdate}
                     onItemRemoval={onItemRemoval}
-                    onSubtaskAdd={subtask => onSubtaskAdd(item, subtask)}
                 />
             ))}
         </React.Fragment>
@@ -93,7 +70,7 @@ function AddItemForm({ onNewItem }) {
         setSubmitting(true);
         fetch('/items', {
             method: 'POST',
-            body: JSON.stringify({ name: newItem }),
+            body: JSON.stringify({ name: newItem, subtasks: [] }), // Add subtasks array
             headers: { 'Content-Type': 'application/json' },
         })
             .then(r => r.json())
@@ -129,18 +106,8 @@ function AddItemForm({ onNewItem }) {
     );
 }
 
-function ItemDisplay({ item, onItemUpdate, onItemRemoval, onSubtaskAdd }) {
+function ItemDisplay({ item, onItemUpdate, onItemRemoval }) {
     const { Container, Row, Col, Button } = ReactBootstrap;
-    const [newSubtask, setNewSubtask] = React.useState('');
-    const[subtasks, setSubtasks] = React.useState(item.subtasks || []);
-
-    const addSubtask = () => {
-        if(newSubtask.trim() === '') return;
-        const updatedSubtasks = [...subtasks, newSubtask];
-        setSubtasks(updatedSubtasks);
-        onSubtaskAdd(updatedSubtasks);
-        setNewSubtask('');
-    }
 
     const toggleCompletion = () => {
         fetch(`/items/${item.id}`, {
@@ -148,6 +115,7 @@ function ItemDisplay({ item, onItemUpdate, onItemRemoval, onSubtaskAdd }) {
             body: JSON.stringify({
                 name: item.name,
                 completed: !item.completed,
+                subtasks: item.subtasks, // Preserve subtasks
             }),
             headers: { 'Content-Type': 'application/json' },
         })
@@ -185,18 +153,9 @@ function ItemDisplay({ item, onItemUpdate, onItemRemoval, onSubtaskAdd }) {
                 </Col>
                 <Col xs={10} className="name">
                     {item.name}
-                    <div className="subtasks">
-                        {subtasks.map((subtask, index) => (
-                            <div key={index}>{subtask}</div>
-                        ))}
-                    </div>
-                    <input 
-                        type="text"
-                        value={newSubtask}
-                        onChange={(e) => setNewSubtask(e.target.value)}
-                        placeholder="Add Subtask"
-                    />
-                    <button onClick={addSubtask}>Add</button>
+                    {item.subtasks && item.subtasks.length > 0 && (
+                        <SubtaskList subtasks={item.subtasks} />
+                    )}
                 </Col>
                 <Col xs={1} className="text-center remove">
                     <Button
@@ -209,8 +168,66 @@ function ItemDisplay({ item, onItemUpdate, onItemRemoval, onSubtaskAdd }) {
                     </Button>
                 </Col>
             </Row>
+            <AddSubtaskForm item={item} onItemUpdate={onItemUpdate} />
         </Container>
     );
 }
 
-ReactDOM.render(<App />, document.getElementById('root'));
+function SubtaskList({ subtasks }) {
+    return (
+        <ul>
+            {subtasks.map((subtask, index) => (
+                <li key={index}>{subtask}</li>
+            ))}
+        </ul>
+    );
+}
+
+function AddSubtaskForm({ item, onItemUpdate }) {
+    const { Form, InputGroup, Button } = ReactBootstrap;
+
+    const [newSubtask, setNewSubtask] = React.useState('');
+
+    const addSubtask = () => {
+        if (newSubtask.trim() !== '') {
+            const updatedItem = { ...item };
+            if (!updatedItem.subtasks) updatedItem.subtasks = [];
+            updatedItem.subtasks.push(newSubtask);
+
+            fetch(`/items/${item.id}`, {
+                method: 'PUT',
+                body: JSON.stringify(updatedItem),
+                headers: { 'Content-Type': 'application/json' },
+            })
+                .then(r => r.json())
+                .then(updatedItem => {
+                    onItemUpdate(updatedItem);
+                    setNewSubtask('');
+                });
+        }
+    };
+
+    return (
+        <Form onSubmit={addSubtask}>
+            <InputGroup className="mb-3">
+                <Form.Control
+                    value={newSubtask}
+                    onChange={e => setNewSubtask(e.target.value)}
+                    type="text"
+                    placeholder="New Subtask"
+                />
+                <InputGroup.Append>
+                    <Button
+                        type="submit"
+                        variant="primary"                      
+                        disabled={!newSubtask.length}
+                    >
+                        Add Subtask
+                    </Button>
+                </InputGroup.Append>
+            </InputGroup>
+        </Form>
+    );
+}
+
+ReactDOM.render(<App />, document.getElementById('root'))
