@@ -2,7 +2,7 @@
 
 services:
   app:
-    image: node:18-alpine
+    image: getting-started
     command: sh -c "yarn install && yarn run dev"
     ports:
       - 80:3000
@@ -15,7 +15,7 @@ services:
       MYSQL_PASSWORD: secret
       MYSQL_DB: todos
   app2:
-    image: node:18-alpine
+    image: read-only
     command: sh -c "yarn install && yarn run dev"
     ports:
       - 8080:3000
