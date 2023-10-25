@@ -2,7 +2,7 @@
 services:
   app:
     container_name: read_write_App
-    image: jenniferkearns/getting-started
+    image: sbarron/getting-started
     ports:
       - 80:3000
     environment:
@@ -29,3 +29,4 @@ services:
       MYSQL_DATABASE: todos
 volumes:
   todo-mysql-data:
+
